@@ -19,10 +19,17 @@ class Cs2AudioPlayer {
     var bufferQueue = Queue<[Float32]>()
     var playQueue = DispatchQueue(label: "playQueue", attributes: .concurrent)
     
-    private var audioFormat = AVAudioFormat(commonFormat: .pcmFormatFloat32, sampleRate: 8000, channels: 1, interleaved: false)
+    private var audioFormat = AVAudioFormat(commonFormat: .pcmFormatFloat32, sampleRate: 8000, channels: 2, interleaved: false)
     
     public func setBufferArray(_ array : [Float32]) {
+        
+//        let randomInt = Int.random(in: 0..<90)
+//        if randomInt == 3 {
+//            self.bufferQueue.enqueue(Array(repeating: Float32(0), count: 1024))
+//            return
+//        }
         self.bufferQueue.enqueue(array)
+        
 //        if array.count < 1024 {
 //            let tempArray = Array(repeating: Float32(0), count: 1024 - array.count)
 //            self.bufferArray = array
@@ -40,7 +47,14 @@ class Cs2AudioPlayer {
     public func isReceiveAudio(_ bool : Bool) {
         do {
             if bool {
-                try self.audioEngine.start()
+                let mainMixer = audioEngine.mainMixerNode
+                audioEngine.attach(audioPlayerNode)
+                audioEngine.connect(audioPlayerNode, to: mainMixer, format: audioFormat)
+                
+                audioEngine.prepare()
+                try audioEngine.start()
+                
+                audioPlayerNode.play()
                 return
             }
             
@@ -67,23 +81,8 @@ class Cs2AudioPlayer {
                 return
             }
             
-            let engine = AVAudioEngine()
-            let playerNode = AVAudioPlayerNode()
-            
-            let mainMixer = engine.mainMixerNode
-            engine.attach(playerNode)
-            engine.connect(playerNode, to: mainMixer, format: buffer.format)
-            
-            engine.prepare()
-            do {
-                try engine.start()
-            } catch {
-                print(error)
-            }
-            
-            playerNode.play()
-            playerNode.scheduleBuffer(buffer, completionHandler: {
-                engine.stop()
+            audioPlayerNode.scheduleBuffer(buffer, completionHandler: {
+                print("Done")
             })
         }
         

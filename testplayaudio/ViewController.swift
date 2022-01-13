@@ -21,22 +21,29 @@ class ViewController: UIViewController {
     override func viewDidLoad() {
         super.viewDidLoad()
 //        self.initAudioPlayer()
-        guard let path = Bundle.main.path(forResource: "addf8_alaw.wav", ofType: nil) else {
+        guard let path = Bundle.main.path(forResource: "m1f1_ulaw.wav", ofType: nil) else {
                 return }
             let url = URL(fileURLWithPath: path)
-
+            
             do {
                 player = try AVAudioPlayer(contentsOf: url)
                 player?.play()
-                
+
             } catch let error {
                 print(error.localizedDescription)
             }
         
         DispatchQueue.main.asyncAfter(deadline: .now() + 5) {
-            let wavInFloatArray = self.readWavIntoFloats(fname: "addf8_ulaw", ext: "wav")
-            self.arrayData = wavInFloatArray.chunked(into: 1024)
-            self.timer = Timer.scheduledTimer(timeInterval: 0.12, target: self, selector: #selector(self.playAudio), userInfo: nil, repeats: true)
+            var wavInFloatArray = self.readWavIntoFloats(fname: "m1f1_ulaw", ext: "wav")
+            wavInFloatArray.append(contentsOf: wavInFloatArray)
+            wavInFloatArray.append(contentsOf: wavInFloatArray)
+            wavInFloatArray.append(contentsOf: wavInFloatArray)
+            wavInFloatArray.append(contentsOf: wavInFloatArray)
+            wavInFloatArray.append(contentsOf: wavInFloatArray)
+            wavInFloatArray.append(contentsOf: wavInFloatArray)
+            self.arrayData = wavInFloatArray.chunked(into: 100)
+            self.initAudioPlayer()
+            self.timer = Timer.scheduledTimer(timeInterval: 0.001, target: self, selector: #selector(self.playAudio), userInfo: nil, repeats: true)
         }
     }
     
@@ -69,7 +76,7 @@ class ViewController: UIViewController {
         
         let url = Bundle.main.url(forResource: fname, withExtension: ext)
         let file = try! AVAudioFile(forReading: url!)
-        let format = AVAudioFormat(commonFormat: .pcmFormatFloat32, sampleRate: 8000, channels: 1, interleaved: false) ?? AVAudioFormat()
+        let format = AVAudioFormat(commonFormat: .pcmFormatFloat32, sampleRate: 8000, channels: 2, interleaved: false) ?? AVAudioFormat()
         
         let buf = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: AVAudioFrameCount(file.length))!
         try! file.read(into: buf)
