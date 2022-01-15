@@ -7,6 +7,8 @@
 
 import UIKit
 import AVFoundation
+import PackageSwiftPcapng
+import AudioToolbox
 
 class ViewController: UIViewController {
     var bombSoundEffect: AVAudioPlayer?
@@ -18,33 +20,81 @@ class ViewController: UIViewController {
     var indexFile = 0
     var timer : Timer?
     
+    // Temp buffer
+    private var intermediateBuffer = Data()
+    private var expectedPacketLength: Int? = nil
+    
     override func viewDidLoad() {
         super.viewDidLoad()
-//        self.initAudioPlayer()
-        guard let path = Bundle.main.path(forResource: "m1f1_ulaw.wav", ofType: nil) else {
-                return }
-            let url = URL(fileURLWithPath: path)
-            
-            do {
-                player = try AVAudioPlayer(contentsOf: url)
-                player?.play()
-
-            } catch let error {
-                print(error.localizedDescription)
-            }
         
-        DispatchQueue.main.asyncAfter(deadline: .now() + 5) {
-            var wavInFloatArray = self.readWavIntoFloats(fname: "m1f1_ulaw", ext: "wav")
-            wavInFloatArray.append(contentsOf: wavInFloatArray)
-            wavInFloatArray.append(contentsOf: wavInFloatArray)
-            wavInFloatArray.append(contentsOf: wavInFloatArray)
-            wavInFloatArray.append(contentsOf: wavInFloatArray)
-            wavInFloatArray.append(contentsOf: wavInFloatArray)
-            wavInFloatArray.append(contentsOf: wavInFloatArray)
-            self.arrayData = wavInFloatArray.chunked(into: 100)
+        do {
+//            guard let path = Bundle.main.path(forResource: "PCMA.raw", ofType: nil) else {
+//                print("no file")
+//                return
+//            }
+//            self.initAudioPlayer()
+//
+//            let _data = try Data(contentsOf: URL(fileURLWithPath: path))
+//            let _dataUint8 = [UInt8](_data)
+////            let _dataUint8s = _dataUint8.chunked(into: 160)
+////            _dataUint8s.forEach { item in
+////                let dataTest = Data(bytes: item, count: item.count)
+////
+////            }
+//            Cs2AudioPlayer.shared.playSound(_data)
+//            return
+            
+            
+            guard let path = Bundle.main.path(forResource: "rtp.pcap", ofType: nil) else {
+                print("no file")
+                return
+            }
             self.initAudioPlayer()
-            self.timer = Timer.scheduledTimer(timeInterval: 0.001, target: self, selector: #selector(self.playAudio), userInfo: nil, repeats: true)
+            
+
+            let data = try Data(contentsOf: URL(fileURLWithPath: path))
+            let pcap = try Pcap(data: data)
+            let pcapPackets = Array(pcap.packets.suffix(pcap.packets.count - 7)).filter { _pcapPacket in
+                return _pcapPacket.packetData.count == 214
+            }
+
+//            var description = AudioStreamBasicDescription(mSampleRate: 8000, mFormatID: kAudioFormatULaw, mFormatFlags: 0, mBytesPerPacket: 160, mFramesPerPacket: 1, mBytesPerFrame: 160, mChannelsPerFrame: 1, mBitsPerChannel: 8, mReserved: 0)
+//            let format = AVAudioFormat(commonFormat: .init(rawValue: 1970037111 )! , sampleRate: 8000, channels: 1, interleaved: false)
+//            let format = AVAudioFormat(streamDescription: &description)!
+            
+//            Cs2AudioPlayer.shared.setAudioFormat(format!)
+            
+            pcapPackets.forEach { rtpPacket in
+                Cs2AudioPlayer.shared.playSound(rtpPacket.packetData)
+            }
+
+        } catch {
+            print(error)
         }
+    }
+    
+    func ALaw_Decode(_ number: UInt8) -> Int16 {
+        var number = number
+        var sign: Int = 0
+        var position: UInt8 = 0
+        var decoded: Int16 = 0
+        number ^= 0x55
+        if number & 0x80 != 0 {
+            number &= ~(1 << 7)
+            sign = -1
+        }
+        position = UInt8(((number & 0xf0) >> 4) + 4)
+        if position != 4 {
+            decoded = Int16((Int((1 << position)) | (Int((number & 0x0f)) << Int((position - 4))) | Int((1 << (position - 5)))))
+        } else {
+            decoded = Int16((number << 1) | 1)
+        }
+        return (sign == 0) ? decoded : (-decoded)
+    }
+    
+    func aFunction(_packets: Array<PcapPacket>, position: Int) -> Array<PcapPacket> {
+        let packkets = Array(_packets[0..<position])
+        return packkets
     }
     
     private func initAudioPlayer() {
@@ -111,9 +161,9 @@ extension AVAudioPCMBuffer {
 }
 
 extension Array where Element: FloatingPoint {
-    mutating func buffer() -> AudioBuffer {
-        return AudioBuffer(mNumberChannels: 1, mDataByteSize: UInt32(self.count * MemoryLayout<Element>.size), mData: &self)
-    }
+    //    mutating func buffer() -> AudioBuffer {
+    //        return AudioBuffer(mNumberChannels: 1, mDataByteSize: UInt32(self.count * MemoryLayout<Element>.size), mData: &self)
+    //    }
 }
 
 extension ViewController {
@@ -140,7 +190,7 @@ extension ViewController {
                     data.append(withUnsafeBytes(of: buf) { Data($0) })
                 }
                 
-                buf = data.makePCMBuffer(format: format)!
+//                buf = data.makePCMBuffer(format: format)!
                 
                 // connect the nodes, and use the data to play
                 let mainMixer = audioEngine.mainMixerNode
